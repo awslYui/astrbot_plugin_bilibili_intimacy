@@ -41,6 +41,19 @@ class CalculatorTests(unittest.TestCase):
         self.assertEqual(plan.first_gift_paid, 199980)
         self.assertEqual(plan.daily_first_multiplier, 3)
 
+    def test_admiral_highest_day_stacks_to_five_point_five_times(self):
+        plan = plan_budget(22000, quality="normal", daily_first_gift="admiral", daily_first_multiplier=3)
+        self.assertEqual(plan.first_gift_paid, 19980)
+        self.assertGreaterEqual(plan.gift_intimacy, round(19980 * 5.5))
+
+    def test_auto_uses_governor_for_highest_three_times_return(self):
+        plan = plan_budget(
+            200000, daily_first_gift="auto", daily_first_multiplier=3
+        )
+        self.assertEqual(plan.first_gift, "governor")
+        self.assertEqual(plan.first_gift_paid, 199980)
+        self.assertEqual(plan.expected_total, 1101441)
+
 
 if __name__ == "__main__":
     unittest.main()
