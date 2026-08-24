@@ -17,6 +17,7 @@ JOURNEY_COST = 500
 BOX_COST = 330
 BOX_CONTRACT_RATE = 0.4008
 FOOD_PER_CONTRACT = 3
+DAILY_FIRST_BASE_MULTIPLIER = 4.5
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,14 @@ QUALITIES = {
     "normal": FoodQuality("normal", "普通", 0, 100),
     "freeze": FoodQuality("freeze", "冻干", 60, 120),
     "fresh": FoodQuality("fresh", "鲜食", 660, 150),
+}
+
+DAILY_FIRST_GIFTS = {
+    "none": {"label": "不指定", "cost": 0, "rmb": 0},
+    "banner": {"label": "粉丝手幅", "cost": 0, "rmb": 0},
+    "captain": {"label": "舰长", "cost": 1_980, "rmb": 198},
+    "admiral": {"label": "提督", "cost": 19_980, "rmb": 1_998},
+    "governor": {"label": "总督", "cost": 199_980, "rmb": 19_998},
 }
 
 LEVELS = (
@@ -53,6 +62,9 @@ class Plan:
     budget: int
     used: int
     quality: FoodQuality
+    first_gift: str
+    first_gift_paid: int
+    daily_first_multiplier: int
     strategy: str
     banner_count: int
     journey_count: int
@@ -85,11 +97,11 @@ def _level_for(growth: float) -> tuple[int, int, int]:
     return result
 
 
-def _choose_strategy(budget: int, quality_cost: int, reminder_enabled: bool, journey_mode: str) -> str:
+def _choose_strategy(budget: int, quality_cost: int, reminder_enabled: bool, journey_mode: str, first_gift_cost: int = 0) -> str:
     journey_cost = 0 if journey_mode == "none" else JOURNEY_COST
-    if reminder_enabled and budget >= quality_cost + 21 + 19_800 + 15_800 + journey_cost:
+    if reminder_enabled and budget >= quality_cost + first_gift_cost + 21 + 19_800 + 15_800 + journey_cost:
         return "high"
-    if budget >= quality_cost + 21 + 1_380 + journey_cost:
+    if budget >= quality_cost + first_gift_cost + 21 + 1_380 + journey_cost:
         return "medium"
     return "low"
 
@@ -103,8 +115,11 @@ def _build_plan(
     journey_mode: str,
     actual_contracts: int,
     allocation: str,
+    daily_first_gift: str,
+    daily_first_multiplier: int,
 ) -> Plan:
-    strategy_key = _choose_strategy(budget, quality.cost, reminder_enabled, journey_mode)
+    first_gift = DAILY_FIRST_GIFTS.get(daily_first_gift, DAILY_FIRST_GIFTS["banner"])
+    strategy_key = _choose_strategy(budget, quality.cost, reminder_enabled, journey_mode, first_gift["cost"])
     strategy = STRATEGIES[strategy_key]
     remaining = budget
 
@@ -115,6 +130,7 @@ def _build_plan(
         return paid
 
     quality_paid = spend(quality.cost) if remaining >= quality.cost else 0
+    first_gift_paid = spend(first_gift["cost"]) if first_gift["cost"] and remaining >= first_gift["cost"] else 0
     banner_count = min(BANNER_LIMIT, remaining // BANNER_COST)
     banner_paid = spend(banner_count * BANNER_COST)
 
@@ -137,7 +153,7 @@ def _build_plan(
     remainder_paid = spend(remaining)
 
     expected_box_contracts = box_count * BOX_CONTRACT_RATE
-    banner_multiplier = 2.67 if daily_banner_first else 2.55
+    banner_multiplier = 2.67 if first_gift["label"] == "粉丝手幅" else 2.55
     cat_food = (
         DAILY_SIGNIN_FOOD + banner_count + (10 if navy_paid else 0)
         + journey_count * 3 + actual_contracts * FOOD_PER_CONTRACT
@@ -149,6 +165,7 @@ def _build_plan(
 
     gift_intimacy = round(
         banner_paid * banner_multiplier
+        + first_gift_paid * DAILY_FIRST_BASE_MULTIPLIER * daily_first_multiplier
         + reminder_paid * 4.5
         + journey_count * JOURNEY_COST * strategy["journey_multiplier"]
         + navy_paid * 5.5
@@ -164,6 +181,8 @@ def _build_plan(
 
     return Plan(
         budget=budget, used=budget - remaining, quality=quality, strategy=strategy_key,
+        first_gift=daily_first_gift, first_gift_paid=first_gift_paid,
+        daily_first_multiplier=daily_first_multiplier,
         banner_count=banner_count, journey_count=journey_count, box_count=box_count,
         expected_box_contracts=expected_box_contracts, cat_food=cat_food, growth=growth,
         level=level, gift_intimacy=gift_intimacy, total_min=total_min,
@@ -181,6 +200,8 @@ def plan_budget(
     journey_mode: str = "single",
     actual_contracts: int = 0,
     allocation: str = "auto",
+    daily_first_gift: str = "banner",
+    daily_first_multiplier: int = 1,
     max_budget: int = MAX_BUDGET,
 ) -> Plan:
     """Create the same battery plan as the original web calculator."""
@@ -191,6 +212,11 @@ def plan_budget(
         "journey_mode": journey_mode if journey_mode in {"single", "all", "none"} else "single",
         "actual_contracts": max(0, int(actual_contracts)),
         "allocation": "intimacy" if allocation == "intimacy" else "auto",
+        "daily_first_gift": (
+            "none" if daily_first_gift == "banner" and not daily_banner_first
+            else daily_first_gift if daily_first_gift in DAILY_FIRST_GIFTS else "banner"
+        ),
+        "daily_first_multiplier": int(daily_first_multiplier) if int(daily_first_multiplier) in {1, 2, 3} else 1,
     }
     if quality in QUALITIES:
         return _build_plan(safe_budget, QUALITIES[quality], **settings)
@@ -208,7 +234,8 @@ def render_plan(plan: Plan) -> str:
     return (
         "哔哩哔哩直播活动电池规划\n"
         f"预算：{plan.budget:,} 电池｜实际分配：{plan.used:,} 电池\n"
-        f"推荐：{plan.quality.label}猫粮 + {plan.box_count} 盒冲猫（{STRATEGIES[plan.strategy]['label']}）\n"
+        + (f"首赠：{DAILY_FIRST_GIFTS[plan.first_gift]['label']} × {plan.daily_first_multiplier}（{plan.first_gift_paid:,} 电池）\n" if plan.first_gift_paid else "")
+        + f"推荐：{plan.quality.label}猫粮 + {plan.box_count} 盒冲猫（{STRATEGIES[plan.strategy]['label']}）\n"
         f"预计亲密度：{plan.expected_total:,}\n"
         f"亲密度范围：{plan.total_min:,} ～ {plan.total_max:,}\n"
         f"礼物产生亲密度：{plan.gift_intimacy:,}｜综合倍率：{multiplier:.2f}×\n"
