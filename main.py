@@ -27,7 +27,9 @@ QUALITY_ALIASES = {
 FIRST_GIFT_ALIASES = {"舰长": "captain", "提督": "admiral", "总督": "governor"}
 
 
-def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
+def parse_options(
+    message: str, default_daily_first_multiplier: int = 3
+) -> tuple[int | None, dict[str, object]]:
     """Extract a battery amount and supported Chinese options from a command."""
     match = re.search(r"(?<!\d)(\d{1,9})(?!\d)", message.replace(",", ""))
     if not match:
@@ -35,8 +37,8 @@ def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
     options: dict[str, object] = {
         "quality": "auto",
         "reminder_enabled": "提醒" in message,
-        "daily_first_gift": "banner",
-        "daily_first_multiplier": 1,
+        "daily_first_gift": "auto",
+        "daily_first_multiplier": default_daily_first_multiplier,
         "journey_mode": "none" if "不跑旅程" in message else "single",
         "allocation": "intimacy" if "确定性" in message else "auto",
     }
@@ -58,7 +60,7 @@ def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
     "astrbot_plugin_bilibili_intimacy",
     "paizi",
     "计算哔哩哔哩直播活动电池可获得的亲密度收益。",
-    "1.1.0",
+    "1.2.0",
 )
 class BilibiliIntimacyPlugin(Star):
     """Chat command wrapper around the tested, dependency-free calculator."""
@@ -70,7 +72,9 @@ class BilibiliIntimacyPlugin(Star):
     @filter.command("电池收益")
     async def battery_return(self, event: AstrMessageEvent):
         """计算预算：/电池收益 1000 鲜食 提醒。"""
-        budget, options = parse_options(event.message_str)
+        default_multiplier = int(self.config.get("daily_first_multiplier", 3))
+        default_multiplier = default_multiplier if default_multiplier in {1, 2, 3} else 3
+        budget, options = parse_options(event.message_str, default_multiplier)
         if budget is None:
             yield event.plain_result(COMMAND_HELP)
             return
