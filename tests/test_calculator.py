@@ -20,12 +20,26 @@ class CalculatorTests(unittest.TestCase):
         plan = plan_budget(5639, daily_banner_first=False)
         self.assertEqual(plan.quality.key, "fresh")
         self.assertEqual(plan.box_count, 4)
+        self.assertAlmostEqual(plan.cat_food, 68.8096)
         self.assertEqual(plan.expected_total, 34668)
 
     def test_reference_38064_plan(self):
         plan = plan_budget(38064, quality="fresh", reminder_enabled=True, daily_banner_first=False)
         self.assertEqual(plan.box_count, 0)
         self.assertEqual(plan.expected_total, 195531)
+
+    def test_governor_daily_first_gift(self):
+        plan = plan_budget(
+            220000,
+            quality="normal",
+            journey_mode="none",
+            allocation="intimacy",
+            daily_first_gift="governor",
+            daily_first_multiplier=3,
+        )
+        self.assertEqual(plan.first_gift, "governor")
+        self.assertEqual(plan.first_gift_paid, 199980)
+        self.assertEqual(plan.daily_first_multiplier, 3)
 
 
 if __name__ == "__main__":
