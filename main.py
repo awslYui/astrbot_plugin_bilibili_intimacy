@@ -60,7 +60,7 @@ def parse_options(
     "astrbot_plugin_bilibili_intimacy",
     "paizi",
     "计算哔哩哔哩直播活动电池可获得的亲密度收益。",
-    "1.2.0",
+    "1.2.1",
 )
 class BilibiliIntimacyPlugin(Star):
     """Chat command wrapper around the tested, dependency-free calculator."""
