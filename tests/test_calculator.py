@@ -1,6 +1,8 @@
 import unittest
+from pathlib import Path
 
-from calculator import clamp_budget, plan_budget
+from calculator import clamp_budget, find_minimum_budget_for_target, plan_budget
+from chart import render_benefit_curve
 
 
 class CalculatorTests(unittest.TestCase):
@@ -53,6 +55,27 @@ class CalculatorTests(unittest.TestCase):
         self.assertEqual(plan.first_gift, "governor")
         self.assertEqual(plan.first_gift_paid, 199980)
         self.assertEqual(plan.expected_total, 1101441)
+
+    def test_reverse_finds_the_exact_minimum_budget_and_plan(self):
+        plan, maximum_plan = find_minimum_budget_for_target(
+            100_000, daily_first_gift="auto", daily_first_multiplier=3
+        )
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertGreaterEqual(plan.expected_total, 100_000)
+        self.assertLess(
+            plan_budget(
+                plan.budget - 1, daily_first_gift="auto", daily_first_multiplier=3
+            ).expected_total,
+            100_000,
+        )
+        self.assertGreaterEqual(maximum_plan.expected_total, 100_000)
+
+    def test_curve_renderer_creates_a_png(self):
+        image = render_benefit_curve(10_000, daily_first_gift="auto", daily_first_multiplier=3)
+        self.assertTrue(image.is_file())
+        self.assertEqual(image.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+        Path(image).unlink()
 
 
 if __name__ == "__main__":
