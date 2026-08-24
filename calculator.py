@@ -265,6 +265,38 @@ def plan_budget(
     return max(candidates, key=lambda item: (item.expected_total, item.growth))
 
 
+def find_minimum_budget_for_target(
+    target_intimacy: int | float | str,
+    *,
+    max_budget: int = MAX_BUDGET,
+    **options: object,
+) -> tuple[Plan | None, Plan]:
+    """Return the least budgeted plan meeting a target and the maximum plan.
+
+    The automatic plan is monotonic with budget: each additional battery can
+    remain in the prior best allocation, while level rewards are nonnegative.
+    This lets binary search find the exact integer battery threshold.
+    """
+    try:
+        target = max(0, int(float(target_intimacy)))
+    except (TypeError, ValueError):
+        target = 0
+    safe_max_budget = clamp_budget(max_budget)
+    settings = {**options, "daily_first_gift": options.get("daily_first_gift", "auto")}
+    maximum_plan = plan_budget(safe_max_budget, max_budget=safe_max_budget, **settings)
+    if maximum_plan.expected_total < target:
+        return None, maximum_plan
+
+    low, high = 0, safe_max_budget
+    while low < high:
+        middle = (low + high) // 2
+        if plan_budget(middle, max_budget=safe_max_budget, **settings).expected_total >= target:
+            high = middle
+        else:
+            low = middle + 1
+    return plan_budget(low, max_budget=safe_max_budget, **settings), maximum_plan
+
+
 def render_plan(plan: Plan) -> str:
     """Render a concise chat-friendly result without platform-specific markup."""
     multiplier = plan.expected_total / plan.budget if plan.budget else 0
