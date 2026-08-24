@@ -58,7 +58,7 @@ def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
     "astrbot_plugin_bilibili_intimacy",
     "paizi",
     "计算哔哩哔哩直播活动电池可获得的亲密度收益。",
-    "1.0.0",
+    "1.1.0",
 )
 class BilibiliIntimacyPlugin(Star):
     """Chat command wrapper around the tested, dependency-free calculator."""
