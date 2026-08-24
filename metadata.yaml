@@ -2,7 +2,7 @@ name: astrbot_plugin_bilibili_intimacy
 display_name: 哔哩哔哩直播活动亲密度计算器
 desc: 通过聊天指令规划电池分配，并估算哔哩哔哩直播活动亲密度收益。
 short_desc: 输入电池数，快速估算活动亲密度收益。
-version: 1.2.0
+version: 1.2.1
 author: paizi
 repo: https://github.com/awslYui/astrbot_plugin_bilibili_intimacy
 astrbot_version: ">=4.16,<5"
