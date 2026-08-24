@@ -17,7 +17,9 @@ JOURNEY_COST = 500
 BOX_COST = 330
 BOX_CONTRACT_RATE = 0.4008
 FOOD_PER_CONTRACT = 3
-DAILY_FIRST_BASE_MULTIPLIER = 4.5
+BASE_GIFT_MULTIPLIER = 1.0
+CAMPAIGN_FIRST_GIFT_BONUS = 1.0
+NAVY_FIRST_GIFT_BONUS = 0.5
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,12 @@ def _choose_strategy(budget: int, quality_cost: int, reminder_enabled: bool, jou
     return "low"
 
 
+def _daily_first_gift_multiplier(first_gift: str, daily_first_multiplier: int) -> float:
+    """Stack base, campaign, reward-day, and Great Navigation bonuses additively."""
+    navy_bonus = NAVY_FIRST_GIFT_BONUS if first_gift in {"captain", "admiral", "governor"} else 0
+    return BASE_GIFT_MULTIPLIER + CAMPAIGN_FIRST_GIFT_BONUS + daily_first_multiplier + navy_bonus
+
+
 def _build_plan(
     budget: int,
     quality: FoodQuality,
@@ -164,9 +172,10 @@ def _build_plan(
     level, gift_min, gift_max = _level_for(growth)
     gift_mid = (gift_min + gift_max) / 2
 
+    first_gift_multiplier = _daily_first_gift_multiplier(daily_first_gift, daily_first_multiplier)
     gift_intimacy = round(
         banner_paid * banner_multiplier
-        + first_gift_paid * DAILY_FIRST_BASE_MULTIPLIER * daily_first_multiplier
+        + first_gift_paid * first_gift_multiplier
         + reminder_paid * 4.5
         + journey_count * JOURNEY_COST * strategy["journey_multiplier"]
         + navy_paid * 5.5
