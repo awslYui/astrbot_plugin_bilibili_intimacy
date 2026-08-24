@@ -35,6 +35,7 @@ QUALITIES = {
 }
 
 DAILY_FIRST_GIFTS = {
+    "auto": {"label": "自动收益最优", "cost": 0, "rmb": 0},
     "none": {"label": "不指定", "cost": 0, "rmb": 0},
     "banner": {"label": "粉丝手幅", "cost": 0, "rmb": 0},
     "captain": {"label": "舰长", "cost": 1_980, "rmb": 198},
@@ -219,12 +220,39 @@ def plan_budget(
         "daily_first_multiplier": int(daily_first_multiplier) if int(daily_first_multiplier) in {1, 2, 3} else 1,
     }
     if quality in QUALITIES:
+        if settings["daily_first_gift"] == "auto":
+            return max(
+                (
+                    _build_plan(
+                        safe_budget,
+                        QUALITIES[quality],
+                        **{**settings, "daily_first_gift": gift},
+                    )
+                    for gift in DAILY_FIRST_GIFTS
+                    if gift != "auto" and DAILY_FIRST_GIFTS[gift]["cost"] <= safe_budget
+                ),
+                key=lambda item: (item.expected_total, item.growth, item.first_gift_paid),
+            )
         return _build_plan(safe_budget, QUALITIES[quality], **settings)
 
-    candidates = [
-        _build_plan(safe_budget, candidate, **settings)
-        for candidate in QUALITIES.values() if candidate.cost <= safe_budget
-    ]
+    candidates = []
+    for candidate in QUALITIES.values():
+        if candidate.cost > safe_budget:
+            continue
+        gifts = (
+            (gift for gift in DAILY_FIRST_GIFTS if gift != "auto")
+            if settings["daily_first_gift"] == "auto"
+            else (settings["daily_first_gift"],)
+        )
+        candidates.extend(
+            _build_plan(
+                safe_budget,
+                candidate,
+                **{**settings, "daily_first_gift": gift},
+            )
+            for gift in gifts
+            if DAILY_FIRST_GIFTS[gift]["cost"] <= safe_budget
+        )
     return max(candidates, key=lambda item: (item.expected_total, item.growth))
 
 
