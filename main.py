@@ -11,18 +11,20 @@ from astrbot.api.star import Context, Star, register
 from .calculator import MAX_BUDGET, plan_budget, render_plan
 
 COMMAND_HELP = """用法：
-/电池收益 <电池数> [普通|冻干|鲜食|自动] [提醒] [不抢首赠] [不跑旅程] [确定性]
+/电池收益 <电池数> [普通|冻干|鲜食|自动] [舰长|提督|总督] [首赠1|首赠2|首赠3] [提醒] [不跑旅程] [确定性]
 
 示例：
 /电池收益 1000
 /电池收益 5639 鲜食 不抢首赠
 /电池收益 38064 鲜食 提醒
+/电池收益 220000 总督 首赠3
 
-选项说明：提醒=加入主播提醒回礼计划；不抢首赠=粉丝手幅不优先拿每日首赠；不跑旅程=不安排亲密之旅；确定性=不分配盲盒。"""
+选项说明：舰长/提督/总督=将该礼物作为每日第一笔；首赠1/2/3=当日首赠倍率；总督按 ¥19,998（199,980 电池）计算；提醒=加入主播提醒回礼计划；不跑旅程=不安排亲密之旅；确定性=不分配盲盒。"""
 
 QUALITY_ALIASES = {
     "普通": "normal", "普通猫粮": "normal", "冻干": "freeze", "鲜食": "fresh", "自动": "auto",
 }
+FIRST_GIFT_ALIASES = {"舰长": "captain", "提督": "admiral", "总督": "governor"}
 
 
 def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
@@ -33,7 +35,8 @@ def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
     options: dict[str, object] = {
         "quality": "auto",
         "reminder_enabled": "提醒" in message,
-        "daily_banner_first": "不抢首赠" not in message,
+        "daily_first_gift": "banner",
+        "daily_first_multiplier": 1,
         "journey_mode": "none" if "不跑旅程" in message else "single",
         "allocation": "intimacy" if "确定性" in message else "auto",
     }
@@ -41,6 +44,13 @@ def parse_options(message: str) -> tuple[int | None, dict[str, object]]:
         if text in message:
             options["quality"] = quality
             break
+    for text, gift in FIRST_GIFT_ALIASES.items():
+        if text in message:
+            options["daily_first_gift"] = gift
+            break
+    multiplier_match = re.search(r"首赠\s*[x×]?\s*([123])", message, flags=re.IGNORECASE)
+    if multiplier_match:
+        options["daily_first_multiplier"] = int(multiplier_match.group(1))
     return int(match.group(1)), options
 
 
