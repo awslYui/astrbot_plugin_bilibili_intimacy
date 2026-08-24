@@ -61,7 +61,7 @@ def parse_options(
     "astrbot_plugin_bilibili_intimacy",
     "paizi",
     "计算哔哩哔哩直播活动电池可获得的亲密度收益。",
-    "1.4.0",
+    "1.4.1",
 )
 class BilibiliIntimacyPlugin(Star):
     """Chat command wrapper around the tested, dependency-free calculator."""
@@ -125,7 +125,16 @@ class BilibiliIntimacyPlugin(Star):
         """Draw the RMB-investment to expected-intimacy curve."""
         default_multiplier = int(self.config.get("daily_first_multiplier", 3))
         default_multiplier = default_multiplier if default_multiplier in {1, 2, 3} else 3
-        _, options = parse_options(event.message_str, default_multiplier)
+        _, parsed_options = parse_options(event.message_str, default_multiplier)
+        options = {
+            "quality": "auto",
+            "reminder_enabled": False,
+            "daily_first_gift": "auto",
+            "daily_first_multiplier": default_multiplier,
+            "journey_mode": "single",
+            "allocation": "auto",
+        }
+        options.update(parsed_options)
         max_budget = int(self.config.get("max_budget", MAX_BUDGET))
         try:
             image_path = render_benefit_curve(max_budget, **options)
