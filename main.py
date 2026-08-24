@@ -8,7 +8,8 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
-from .calculator import MAX_BUDGET, plan_budget, render_plan
+from .chart import render_benefit_curve
+from .calculator import MAX_BUDGET, find_minimum_budget_for_target, plan_budget, render_plan
 
 COMMAND_HELP = """用法：
 /电池收益 <电池数> [普通|冻干|鲜食|自动] [舰长|提督|总督] [首赠1|首赠2|首赠3] [提醒] [不跑旅程] [确定性]
@@ -60,7 +61,7 @@ def parse_options(
     "astrbot_plugin_bilibili_intimacy",
     "paizi",
     "计算哔哩哔哩直播活动电池可获得的亲密度收益。",
-    "1.2.1",
+    "1.4.0",
 )
 class BilibiliIntimacyPlugin(Star):
     """Chat command wrapper around the tested, dependency-free calculator."""
@@ -90,6 +91,54 @@ class BilibiliIntimacyPlugin(Star):
             yield event.plain_result("参数无法识别，请检查后重试。\n\n" + COMMAND_HELP)
             return
         yield event.plain_result(render_plan(plan))
+
+    @filter.command("\u4eb2\u5bc6\u5ea6\u53cd\u63a8")
+    async def intimacy_reverse(self, event: AstrMessageEvent):
+        """Find the least battery budget that meets an intimacy target."""
+        default_multiplier = int(self.config.get("daily_first_multiplier", 3))
+        default_multiplier = default_multiplier if default_multiplier in {1, 2, 3} else 3
+        target, options = parse_options(event.message_str, default_multiplier)
+        if target is None:
+            yield event.plain_result("\u7528\u6cd5\uff1a/\u4eb2\u5bc6\u5ea6\u53cd\u63a8 <\u76ee\u6807\u4eb2\u5bc6\u5ea6> [\u53ef\u9009\u89c4\u5219]")
+            return
+        max_budget = int(self.config.get("max_budget", MAX_BUDGET))
+        try:
+            plan, maximum_plan = find_minimum_budget_for_target(
+                target, max_budget=max_budget, **options
+            )
+        except (TypeError, ValueError) as exc:
+            logger.warning("intimacy reverse calculation has invalid options: %s", exc)
+            yield event.plain_result("\\u53c2\\u6570\\u65e0\\u6cd5\\u8bc6\\u522b\\uff0c\\u8bf7\\u68c0\\u67e5\\u540e\\u91cd\\u8bd5\\u3002")
+            return
+        if plan is None:
+            yield event.plain_result(
+                f"\u5728 {max_budget:,} \u7535\u6c60\u4e0a\u9650\u5185\u65e0\u6cd5\u8fbe\u5230 {target:,} \u4eb2\u5bc6\u5ea6\uff1b"
+                f"\u6700\u9ad8\u9884\u8ba1\u4e3a {maximum_plan.expected_total:,}\u3002"
+            )
+            return
+        yield event.plain_result(
+            f"\u76ee\u6807 {target:,} \u4eb2\u5bc6\u5ea6\uff1a\u6700\u5c11\u9700\u8981 {plan.budget:,} \u7535\u6c60\u3002\n\n{render_plan(plan)}"
+        )
+
+    @filter.command("\u6536\u76ca\u66f2\u7ebf")
+    async def benefit_curve(self, event: AstrMessageEvent):
+        """Draw the RMB-investment to expected-intimacy curve."""
+        default_multiplier = int(self.config.get("daily_first_multiplier", 3))
+        default_multiplier = default_multiplier if default_multiplier in {1, 2, 3} else 3
+        _, options = parse_options(event.message_str, default_multiplier)
+        max_budget = int(self.config.get("max_budget", MAX_BUDGET))
+        try:
+            image_path = render_benefit_curve(max_budget, **options)
+            maximum_plan = plan_budget(max_budget, max_budget=max_budget, **options)
+        except (OSError, TypeError, ValueError) as exc:
+            logger.warning("benefit curve generation failed: %s", exc)
+            yield event.plain_result("\u6536\u76ca\u66f2\u7ebf\u751f\u6210\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002")
+            return
+        yield event.plain_result(
+            f"\u6536\u76ca\u66f2\u7ebf\uff1a\u4eba\u6c11\u5e01\u6295\u5165 0 \u81f3 {max_budget / 10:,.0f}\u5143\uff0c"
+            f"\u9884\u8ba1\u4eb2\u5bc6\u5ea6\u6700\u9ad8 {maximum_plan.expected_total:,}\u3002"
+        )
+        yield event.image_result(str(image_path))
 
     @filter.command("电池收益帮助")
     async def battery_return_help(self, event: AstrMessageEvent):
