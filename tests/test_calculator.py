@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from calculator import clamp_budget, find_minimum_budget_for_target, plan_budget
+from calculator import clamp_budget, find_minimum_budget_for_target, plan_budget, render_plan
 from chart import render_benefit_curve
 
 
@@ -76,6 +76,15 @@ class CalculatorTests(unittest.TestCase):
         self.assertTrue(image.is_file())
         self.assertEqual(image.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
         Path(image).unlink()
+
+    def test_first_gift_multiplier_is_not_rendered_as_quantity(self):
+        plan = plan_budget(
+            300_000, daily_first_gift="governor", daily_first_multiplier=3
+        )
+        output = render_plan(plan)
+        self.assertIn("总督 1 个", output)
+        self.assertIn("9/13 +300%", output)
+        self.assertNotIn("总督 × 3", output)
 
 
 if __name__ == "__main__":
