@@ -115,6 +115,23 @@ def _daily_first_gift_multiplier(first_gift: str, daily_first_multiplier: int) -
     return BASE_GIFT_MULTIPLIER + CAMPAIGN_FIRST_GIFT_BONUS + daily_first_multiplier + navy_bonus
 
 
+def first_gift_schedule(first_gift: str, daily_first_multiplier: int) -> str:
+    """Describe the one qualifying first-gift order without confusing a multiplier for a quantity."""
+    if first_gift not in {"captain", "admiral", "governor"}:
+        return "未安排舰船礼物首赠"
+    reward_days = {
+        3: ("9/13", "+300%"),
+        2: ("8/26", "+200%"),
+        1: ("普通奖励日", "+100%"),
+    }
+    date, bonus = reward_days.get(daily_first_multiplier, reward_days[1])
+    total_multiplier = _daily_first_gift_multiplier(first_gift, daily_first_multiplier)
+    return (
+        f"{DAILY_FIRST_GIFTS[first_gift]['label']} 1 个，放在 {date} {bonus} 首赠窗口"
+        f"（总倍率 {total_multiplier:.1f}×；同一奖励日仅首笔礼物享受该加成）"
+    )
+
+
 def _build_plan(
     budget: int,
     quality: FoodQuality,
@@ -300,15 +317,18 @@ def find_minimum_budget_for_target(
 def render_plan(plan: Plan) -> str:
     """Render a concise chat-friendly result without platform-specific markup."""
     multiplier = plan.expected_total / plan.budget if plan.budget else 0
+    schedule = first_gift_schedule(plan.first_gift, plan.daily_first_multiplier)
     return (
         "哔哩哔哩直播活动电池规划\n"
         f"预算：{plan.budget:,} 电池｜实际分配：{plan.used:,} 电池\n"
-        + (f"首赠：{DAILY_FIRST_GIFTS[plan.first_gift]['label']} × {plan.daily_first_multiplier}（{plan.first_gift_paid:,} 电池）\n" if plan.first_gift_paid else "")
+        + (f"首赠安排：{schedule}｜支出 {plan.first_gift_paid:,} 电池\n" if plan.first_gift_paid else "")
         + f"推荐：{plan.quality.label}猫粮 + {plan.box_count} 盒冲猫（{STRATEGIES[plan.strategy]['label']}）\n"
         f"预计亲密度：{plan.expected_total:,}\n"
         f"亲密度范围：{plan.total_min:,} ～ {plan.total_max:,}\n"
         f"礼物产生亲密度：{plan.gift_intimacy:,}｜综合倍率：{multiplier:.2f}×\n"
         f"猫粮：{plan.cat_food:.4f} 份｜成长值：{plan.growth:,.0f}｜Lv.{plan.level}\n"
         f"粉丝手幅：{plan.banner_count}｜亲密之旅：{plan.journey_count}｜主播榜亲密值：{plan.host_score:,}\n\n"
-        "说明：盲盒契约与主播榜数值基于参考计算器样例估算，结果仅作活动规划参考。"
+        "说明：盲盒契约与主播榜数值基于参考计算器样例估算，结果仅作活动规划参考。\n"
+        "舰船礼物时点建议：优先 9/13 +300% 窗口，总督/提督/舰长三选一各上 1 个；\n"
+        "预算或资格不足时再用 8/26 +200% 窗口补 1 个。倍率数字表示加成档位，不表示购买数量。"
     )
